@@ -28,7 +28,7 @@ class PitchDetections:
 
     @property
     def num_keypoints(self) -> int:
-        return len(selٍٍٍf.keypoints)
+        return len(self.keypoints)
 
     @property
     def is_empty(self) -> bool:

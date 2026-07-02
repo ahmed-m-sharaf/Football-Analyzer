@@ -1,5 +1,6 @@
+import numpy as np
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from sports.configs.soccer import SoccerPitchConfiguration
 
@@ -19,18 +20,13 @@ class PitchPoint:
 class PitchConfiguration:
     """
     Represents the geometry of a football pitch.
-
-    Stores:
-        - Pitch dimensions
-        - World coordinates of all pitch landmarks
-        - Connections between landmarks
     """
 
     def __init__(self) -> None:
 
         config = SoccerPitchConfiguration()
 
-        # Pitch Dimension
+
         self.length: float = config.length
         self.width: float = config.width
 
@@ -43,9 +39,6 @@ class PitchConfiguration:
         self.center_circle_radius: float = config.centre_circle_radius
         self.penalty_spot_distance: float = config.penalty_spot_distance
 
-        # World Coordinates
-        self.world_coordinates: List[Tuple[float, float]] = config.vertices
-
         labels: List[str] = config.labels
 
         self._points: List[PitchPoint] = [
@@ -55,16 +48,22 @@ class PitchConfiguration:
                 y=y,
                 label=labels[i],
             )
-            for i, (x, y) in enumerate(self.world_coordinates)
+            for i, (x, y) in enumerate(config.vertices)
         ]
 
-        self._point_map = {
+        self._point_map: Dict[int, PitchPoint] = {
             point.id: point
             for point in self._points
         }
 
-        # Pitch Connections
+        self._world_points = np.asarray(
+            [(point.x, point.y) for point in self._points],
+            dtype=np.float32,
+        )
+
+
         self._edges: List[Tuple[int, int]] = config.edges
+
 
     @property
     def points(self) -> List[PitchPoint]:
@@ -75,6 +74,10 @@ class PitchConfiguration:
         return self._edges.copy()
 
     @property
+    def world_points(self) -> np.ndarray:
+        return self._world_points.copy()
+
+    @property
     def num_points(self) -> int:
         return len(self._points)
 
@@ -82,17 +85,40 @@ class PitchConfiguration:
     def dimensions(self) -> Tuple[float, float]:
         return self.length, self.width
 
+    @property
+    def center(self) -> Tuple[float, float]:
+        return (
+            self.length / 2,
+            self.width / 2,
+        )
+
+
     def is_valid_point(self, class_id: int) -> bool:
         return class_id in self._point_map
 
     def get_point(self, class_id: int) -> PitchPoint:
         if not self.is_valid_point(class_id):
-            raise ValueError(f"Invalid pitch point id: {class_id}")
+            raise KeyError(f"Pitch point {class_id} does not exist.")
 
         return self._point_map[class_id]
 
-    def get_points(self, class_ids: List[int]) -> List[PitchPoint]:
-        return [self.get_point(i) for i in class_ids]
+    def get_points(
+        self,
+        class_ids: List[int],
+    ) -> List[PitchPoint]:
+        return [self.get_point(class_id) for class_id in class_ids]
 
-    def get_all_points(self) -> List[PitchPoint]:
-        return self.points
+    def world_points_by_ids(
+        self,
+        class_ids: List[int],
+    ) -> np.ndarray:
+        """
+        Returns world coordinates corresponding to the given class ids.
+        """
+
+        points = self.get_points(class_ids)
+
+        return np.asarray(
+            [(point.x, point.y) for point in points],
+            dtype=np.float32,
+        )

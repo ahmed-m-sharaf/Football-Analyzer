@@ -1,8 +1,10 @@
+from dataclasses import dataclass, field
+from typing import List, Optional
+
 import numpy as np
 from inference import get_model
 
-from typing import List, Tuple, Dict, Optional
-from dataclasses import dataclass, field
+
 
 @dataclass(frozen=True, slots=True)
 class DetectedKeyPoint:
@@ -17,28 +19,16 @@ class DetectedKeyPoint:
 
 
 @dataclass(slots=True)
-class PitchDetectionResult:
+class PitchDetections:
     """
-    Detection result for a single frame.
+    Collection of detected pitch keypoints for a single frame.
     """
 
     keypoints: List[DetectedKeyPoint] = field(default_factory=list)
-    _keypoint_map: Dict[int, DetectedKeyPoint] = field(
-        init=False,
-        repr=False,
-    )
-    def __post_init__(self) -> None:
-        self._keypoint_map: Dict[int, DetectedKeyPoint] = {
-            kp.class_id: kp
-            for kp in self.keypoints
-        }
-        
-
-   
 
     @property
     def num_keypoints(self) -> int:
-        return len(self.keypoints)
+        return len(selٍٍٍf.keypoints)
 
     @property
     def is_empty(self) -> bool:
@@ -48,10 +38,13 @@ class PitchDetectionResult:
         return self.num_keypoints >= min_points
 
     def get(self, class_id: int) -> Optional[DetectedKeyPoint]:
-        return self._keypoint_map.get(class_id)
+        for kp in self.keypoints:
+            if kp.class_id == class_id:
+                return kp
+        return None
 
     def class_ids(self) -> List[int]:
-        return list(self._keypoint_map.keys())
+        return [kp.class_id for kp in self.keypoints]
 
     def image_points(self) -> np.ndarray:
         return np.asarray(
@@ -61,7 +54,7 @@ class PitchDetectionResult:
 
     def image_points_by_ids(
         self,
-        class_ids: List[int]
+        class_ids: List[int],
     ) -> np.ndarray:
 
         points = []
@@ -75,18 +68,6 @@ class PitchDetectionResult:
 
         return np.asarray(points, dtype=np.float32)
 
-    def filter(
-        self,
-        confidence_threshold: float,
-    ) -> "PitchDetectionResult":
-
-        return PitchDetectionResult(
-            [
-                kp
-                for kp in self.keypoints
-                if kp.confidence >= confidence_threshold
-            ]
-        )
 
 
 class RoboflowPitchDetector:
@@ -114,10 +95,8 @@ class RoboflowPitchDetector:
     ) -> np.ndarray:
         """
         Apply preprocessing before inference.
-
-        Override this method if resizing, normalization,
-        or color conversion becomes necessary.
         """
+
         return frame
 
     def _inference(
@@ -127,18 +106,19 @@ class RoboflowPitchDetector:
         """
         Run Roboflow inference.
         """
+
         return self.model.infer(frame)[0]
 
     def _postprocess(
         self,
         prediction,
-    ) -> PitchDetectionResult:
+    ) -> PitchDetections:
         """
-        Convert Roboflow output into PitchDetectionResult.
+        Convert Roboflow output to PitchDetectionResult.
         """
 
         if not prediction.predictions:
-            return PitchDetectionResult()
+            return PitchDetections()
 
         prediction = prediction.predictions[0]
 
@@ -158,12 +138,12 @@ class RoboflowPitchDetector:
                 )
             )
 
-        return PitchDetectionResult(keypoints)
+        return PitchDetections(keypoints)
 
     def detect(
         self,
         frame: np.ndarray,
-    ) -> PitchDetectionResult:
+    ) -> PitchDetections:
         """
         Detect football pitch keypoints from a frame.
         """

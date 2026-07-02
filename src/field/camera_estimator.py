@@ -63,10 +63,6 @@ class CameraEstimator:
             HomographyResult
         ] = None
 
-    # ==========================================================
-    # Properties
-    # ==========================================================
-
     @property
     def is_initialized(self) -> bool:
         return self._homography is not None
@@ -95,9 +91,6 @@ class CameraEstimator:
     def transformer(self) -> CoordinateTransformer:
         return self._transformer
 
-    # ==========================================================
-    # Public API
-    # ==========================================================
 
     def initialize(
         self,
@@ -178,10 +171,6 @@ class CameraEstimator:
 
         self._detections = None
         self._homography = None
-
-    # ==========================================================
-    # Coordinate Conversion
-    # ==========================================================
 
     def image_to_world(
         self,

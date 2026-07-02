@@ -46,7 +46,7 @@ class TeamAssigner:
 
         player_colors = []
         for _,player_detection in player_detections.items():
-            bbox = player_detections['bbox']
+            bbox = player_detection['bbox']
             player_color = self.get_player_color(frame, bbox)
             player_colors.append(player_color)
 

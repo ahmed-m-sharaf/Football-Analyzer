@@ -47,10 +47,6 @@ class OpticalFlowTracker:
 
         self.reset()
 
-    # ======================================================
-    # Properties
-    # ======================================================
-
     @property
     def is_initialized(self) -> bool:
         return (
@@ -78,9 +74,6 @@ class OpticalFlowTracker:
 
         return False
 
-    # ======================================================
-    # Public API
-    # ======================================================
 
     def initialize(
         self,
@@ -110,9 +103,6 @@ class OpticalFlowTracker:
 
         self._frames_since_detection = 0
 
-    # ======================================================
-    # Tracking
-    # ======================================================
 
     def track(
         self,
@@ -135,9 +125,6 @@ class OpticalFlowTracker:
             .reshape(-1, 1, 2)
         )
 
-        # --------------------------------------------
-        # Forward Optical Flow
-        # --------------------------------------------
 
         next_points, status_forward, _ = cv2.calcOpticalFlowPyrLK(
             self._previous_gray,
@@ -152,10 +139,6 @@ class OpticalFlowTracker:
         if next_points is None:
             self.reset()
             return PitchDetections()
-
-        # --------------------------------------------
-        # Backward Optical Flow
-        # --------------------------------------------
 
         backward_points, status_backward, _ = cv2.calcOpticalFlowPyrLK(
             current_gray,
@@ -191,9 +174,6 @@ class OpticalFlowTracker:
             if not ok_backward[0]:
                 continue
 
-            # ----------------------------------------
-            # Forward-Backward Error
-            # ----------------------------------------
 
             fb_error = np.linalg.norm(
                 prev_point[0] - back_point[0]

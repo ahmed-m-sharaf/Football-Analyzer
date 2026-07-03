@@ -82,9 +82,10 @@ class FootballTracker:
         source_video_path: str,
         target_video_path: str,
         conf: float = 0.4,
-    ) -> None:
+    ) -> list[dict]:
         """
-        Run the tracking pipeline on the given input video and save the annotated result.
+        Run the tracking pipeline on the given input video, save the annotated result,
+        and return the tracking/detection data.
 
         Parameters
         ----------
@@ -94,6 +95,11 @@ class FootballTracker:
             Path to save the annotated output video.
         conf : float
             Confidence threshold for YOLO predictions.
+
+        Returns
+        -------
+        list[dict]
+            A list of dictionaries, one per frame, containing ball and player detections.
         """
         if not os.path.exists(source_video_path):
             raise FileNotFoundError(
@@ -111,9 +117,10 @@ class FootballTracker:
             os.makedirs(target_dir, exist_ok=True)
 
         self.tracker.reset()
+        tracking_data = []
 
         with sv.VideoSink(target_video_path, video_info) as sink:
-            for frame in sv.get_video_frames_generator(source_video_path):
+            for frame_idx, frame in enumerate(sv.get_video_frames_generator(source_video_path)):
                 # YOLO Inference
                 results = self.model.predict(
                     frame, conf=conf, device=self.device, verbose=False
@@ -139,6 +146,37 @@ class FootballTracker:
                     all_detections
                 )
 
+                # Format ball data
+                ball_list = []
+                for bbox, confidence in zip(ball_detections.xyxy, ball_detections.confidence):
+                    ball_list.append({
+                        "bbox": bbox.tolist(),
+                        "confidence": float(confidence),
+                    })
+
+                # Format player/referee/goalkeeper data
+                player_list = []
+                if all_detections.tracker_id is not None:
+                    for bbox, tracker_id, class_id, confidence in zip(
+                        all_detections.xyxy,
+                        all_detections.tracker_id,
+                        all_detections.class_id,
+                        all_detections.confidence
+                    ):
+                        player_list.append({
+                            "bbox": bbox.tolist(),
+                            "tracker_id": int(tracker_id),
+                            "class_id": int(class_id + 1),  # Original YOLO class ID
+                            "shifted_class_id": int(class_id),  # Shifted class ID
+                            "confidence": float(confidence),
+                        })
+
+                tracking_data.append({
+                    "frame_index": frame_idx,
+                    "ball": ball_list,
+                    "players": player_list,
+                })
+
                 # Format tracker ID labels
                 labels = [
                     f"#{tracker_id}" for tracker_id in all_detections.tracker_id
@@ -159,6 +197,7 @@ class FootballTracker:
                 sink.write_frame(annotated)
 
         print(f"Video processing finished. Output saved to {target_video_path}")
+        return tracking_data
 
 
 if __name__ == "__main__":

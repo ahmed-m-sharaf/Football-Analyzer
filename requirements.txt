@@ -1,3 +1,5 @@
 supervision
 inference
 sports
+ultralytics
+roboflow

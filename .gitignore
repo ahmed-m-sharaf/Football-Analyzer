@@ -223,3 +223,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# YOLO training runs and downloaded datasets
+/runs/
+/datasets/

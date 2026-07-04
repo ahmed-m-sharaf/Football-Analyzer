@@ -15,6 +15,8 @@ class HomographyResult:
 
     matrix: np.ndarray
     mask: np.ndarray
+    reprojection_error: float
+    inlier_ratio: float
 
     @property
     def num_inliers(self) -> int:
@@ -78,7 +80,26 @@ class HomographyEstimator:
                 "Failed to estimate homography matrix."
             )
 
+        # Calculate reprojection error in pixels by projecting world points back to image plane
+        try:
+            inv_matrix = np.linalg.inv(matrix)
+            world_pts_reshaped = world_points.reshape(-1, 1, 2)
+            projected_img_pts = cv2.perspectiveTransform(
+                world_pts_reshaped,
+                inv_matrix,
+            ).reshape(-1, 2)
+            errors = np.linalg.norm(image_points - projected_img_pts, axis=1)
+            reprojection_error = float(np.mean(errors))
+        except Exception:
+            reprojection_error = float("inf")
+
+        # Calculate inlier ratio
+        total_points = len(mask)
+        inlier_ratio = float(mask.sum() / total_points) if total_points > 0 else 0.0
+
         return HomographyResult(
             matrix=matrix,
             mask=mask,
+            reprojection_error=reprojection_error,
+            inlier_ratio=inlier_ratio,
         )

@@ -170,7 +170,9 @@ venv.bak/
 /site
 
 # folders
-/data
+/data/videos/
+/data/cache/
+/data/images/
 
 resources.txt
 

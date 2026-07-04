@@ -1,4 +1,8 @@
 import os
+import subprocess
+import imageio_ffmpeg
+from dotenv import load_dotenv
+load_dotenv()
 import streamlit as st
 import tempfile
 from src.main import run_pipeline
@@ -138,6 +142,20 @@ with col1:
     )
 
     if uploaded_file is not None:
+        # Resolve folders for input/output videos
+        input_dir = os.path.join("data", "videos", "input")
+        output_dir = os.path.join("data", "videos", "output")
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        input_path = os.path.join(input_dir, uploaded_file.name)
+        output_path = os.path.join(output_dir, uploaded_file.name)
+
+        # Save uploaded file only if it doesn't exist or size is different
+        if not os.path.exists(input_path) or os.path.getsize(input_path) != uploaded_file.size:
+            with open(input_path, "wb") as f:
+                f.write(uploaded_file.read())
+
         # Show file metadata
         file_details = {
             "Filename": uploaded_file.name,
@@ -145,69 +163,95 @@ with col1:
             "FileSize": f"{uploaded_file.size / (1024 * 1024):.2f} MB",
         }
         st.write(file_details)
-        
-        if model_ready:
-            process_btn = st.button("🚀 Process Video", use_container_width=True)
+
+        # Display uploaded video with play capability
+        st.video(input_path)
+
+        # Check if already processed
+        cached_processed = os.path.exists(output_path) and not st.session_state.get("force_reprocess", False)
+
+        if cached_processed:
+            st.success("✅ Previously processed version found! Displaying cached results.")
+            if st.button("🔄 Re-process Video", use_container_width=True):
+                st.session_state["force_reprocess"] = True
+                st.rerun()
         else:
-            st.warning("⚠️ Please upload the real YOLO model weights in the sidebar to enable video processing.")
+            if model_ready:
+                process_btn = st.button("🚀 Process Video", use_container_width=True)
+            else:
+                st.warning("⚠️ Please upload the real YOLO model weights in the sidebar to enable video processing.")
 
 with col2:
     st.subheader("📊 Output & Processing Status")
-    
-    if uploaded_file is not None and 'process_btn' in locals() and process_btn:
-        # Create temp files for input/output to avoid naming conflicts
-        temp_dir = tempfile.gettempdir()
-        temp_input_path = os.path.join(temp_dir, "input_match.mp4")
-        temp_output_path = os.path.join(temp_dir, "output_match_annotated.mp4")
-        
-        # Save uploaded file
-        with open(temp_input_path, "wb") as f:
-            f.write(uploaded_file.read())
-            
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
-        
-        # Streamlit progress callback
-        def streamlit_progress_callback(current_frame, total_frames):
-            percent = float(current_frame / total_frames)
-            progress_bar.progress(percent)
-            status_text.text(f"Processed frame {current_frame} / {total_frames} ({percent * 100:.1f}%)")
 
-        status_text.text("Initializing YOLO model and processing pipeline...")
-        
-        # Resolve device option
-        device_opt = None if execution_device == "auto" else execution_device
-        
-        try:
-            # Run the integrated pipeline
-            run_pipeline(
-                model_path=yolo_model,
-                source_video=temp_input_path,
-                target_video=temp_output_path,
-                conf=conf_threshold,
-                device=device_opt,
-                roboflow_key=roboflow_api_key if roboflow_api_key else None,
-                progress_callback=streamlit_progress_callback,
-            )
-            
-            status_text.text("Finished processing!")
-            st.success("Analysis complete!")
-            
+    if uploaded_file is not None:
+        if cached_processed:
+            # Display processed video with play capability
+            st.video(output_path)
+
             # Download button
-            with open(temp_output_path, "rb") as file:
-                btn = st.download_button(
+            with open(output_path, "rb") as file:
+                st.download_button(
                     label="📥 Download Annotated Video",
                     data=file,
-                    file_name="annotated_football_match.mp4",
+                    file_name=uploaded_file.name,
                     mime="video/mp4",
                     use_container_width=True,
                 )
+        elif 'process_btn' in locals() and process_btn:
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+
+            # Streamlit progress callback
+            def streamlit_progress_callback(current_frame, total_frames):
+                percent = float(current_frame / total_frames)
+                progress_bar.progress(percent)
+                status_text.text(f"Processed frame {current_frame} / {total_frames} ({percent * 100:.1f}%)")
+
+            status_text.text("Initializing YOLO model and processing pipeline...")
+
+            # Resolve device option
+            device_opt = None if execution_device == "auto" else execution_device
+
+            try:
+                temp_output_path = output_path + ".temp.mp4"
+
+                # Run the integrated pipeline
+                run_pipeline(
+                    model_path=yolo_model,
+                    source_video=input_path,
+                    target_video=temp_output_path,
+                    conf=conf_threshold,
+                    device=device_opt,
+                    roboflow_key=roboflow_api_key if roboflow_api_key else None,
+                    progress_callback=streamlit_progress_callback,
+                )
+
+                status_text.text("Converting video to web-playable H.264 format...")
                 
-            # HTML5 player tip
-            st.info("💡 Tip: If you download the video, you can view it on your local media player (VLC, QuickTime, etc.).")
-            
-        except Exception as e:
-            st.error(f"An error occurred during processing: {e}")
-            st.exception(e)
+                # Convert the output video to H.264 codec using imageio_ffmpeg static binary
+                ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+                cmd = [
+                    ffmpeg_exe, "-y",
+                    "-i", temp_output_path,
+                    "-vcodec", "libx264",
+                    "-f", "mp4",
+                    output_path
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                # Clean up temp file
+                if os.path.exists(temp_output_path):
+                    os.remove(temp_output_path)
+
+                # Reset reprocess flag and rerun to trigger cached display state
+                st.session_state["force_reprocess"] = False
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"An error occurred during processing: {e}")
+                st.exception(e)
+        else:
+            st.info("Upload a video and click 'Process Video' to start analysis.")
     else:
         st.info("Upload a video and click 'Process Video' to start analysis.")

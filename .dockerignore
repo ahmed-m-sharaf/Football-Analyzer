@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Environment files and credentials
+.env
+.env.example
+
+# Python cache and distribution files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+env/
+venv/
+
+# Local media / video files
+data/videos/input/*
+data/videos/output/*
+!data/videos/input/.gitkeep
+!data/videos/output/.gitkeep
+
+# Large YOLO models (let user upload it or mount it)
+data/models/*.pt
+!data/models/.gitkeep
+
+# Docker specific files
+Dockerfile
+.dockerignore

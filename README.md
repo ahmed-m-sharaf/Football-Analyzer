@@ -181,6 +181,8 @@ visualizer = MatchVisualizer()
 
 ## 👥 Project Team
 
-- **Hossam** – Player, Referee, & Ball Object Detection Model
-- **Mahmoud** – Team Classification & Color Assignment
-- **Sharaf** – Telemetry Computations (Speed, Distance, Possession) & Streamlit Interface
+| Name | GitHub |
+|------|--------|
+| Ahmed Sharaf | [@ahmed-m-sharaf](https://github.com/ahmed-m-sharaf) |
+| Hossam Elsherbiny | [@H-Elsherbiny](https://github.com/H-Elsherbiny) |
+| Mahmoud Behiery | [@mahmoudBehiery](https://github.com/mahmoudBehiery) |

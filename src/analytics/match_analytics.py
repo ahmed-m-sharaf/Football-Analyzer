@@ -15,16 +15,17 @@ class MatchAnalytics:
         fps: float = 30.0,
         possession_threshold_meters: float = 2.0,
         speed_window_size: int = 15,
-        max_valid_step_meters: float = 12.0,  # Max distance a player can cover in 1 frame (~432 km/h, filters jumps)
+        max_valid_step_meters: float = 12.0,  # Deprecated in favor of dynamic physical limit
+        debug: bool = False,
     ) -> None:
         self.fps = fps
         self.dt = 1.0 / fps
         self.possession_threshold = possession_threshold_meters
         self.speed_window_size = speed_window_size
-        self.max_valid_step = max_valid_step_meters
+        self.debug = debug
 
         # Initialize distance calculator with a scale of 100.0 (centimeters to meters)
-        self.distance_calc = DistanceCalculator(millimeters_per_meter=100.0)
+        self.distance_calc = DistanceCalculator(units_per_meter=100.0)
 
         # Player tracking dictionaries
         # tracker_id -> list of world positions
@@ -35,6 +36,8 @@ class MatchAnalytics:
         self.player_speeds_history: Dict[int, deque] = {}
         # tracker_id -> current smoothed speed in km/h
         self.player_current_speeds: Dict[int, float] = {}
+        # tracker_id -> last frame index when the player was seen
+        self.player_last_frame: Dict[int, int] = {}
 
         # Team possession statistics
         self.possession_frames: Dict[int, int] = {1: 0, 2: 0}
@@ -50,22 +53,6 @@ class MatchAnalytics:
     ) -> Dict[str, any]:
         """
         Update analytics for the current frame.
-
-        Parameters
-        ----------
-        players : List[dict]
-            List of detected/tracked players in the current frame.
-        ball : List[dict]
-            List of detected ball objects in the current frame (expected 0 or 1).
-        transformer : CoordinateTransformer
-            Transformer to convert image coordinates to world coordinates.
-        frame_idx : int
-            Current frame index.
-
-        Returns
-        -------
-        Dict[str, any]
-            Calculated metrics for the current frame.
         """
         # 1. Update player positions, distance covered, and speed
         for player in players:
@@ -91,47 +78,75 @@ class MatchAnalytics:
             else:
                 world_pos = img_pos
 
-            # Track positions
+            # Track positions initialization
             if tracker_id not in self.player_positions:
                 self.player_positions[tracker_id] = []
                 self.player_distances[tracker_id] = 0.0
                 self.player_speeds_history[tracker_id] = deque(maxlen=self.speed_window_size)
                 self.player_current_speeds[tracker_id] = 0.0
+                self.player_last_frame[tracker_id] = -999
 
-            # Calculate movement since last frame
-            if len(self.player_positions[tracker_id]) > 0:
+            # Maximum physical running speed of a human is ~40 km/h = 11.11 m/s.
+            # Maximum step distance in 1 frame is: 11.11 * dt
+            max_step = 11.11 * self.dt
+            # Add tolerance for coordinate noise/jitter
+            max_step_with_tolerance = max_step * 1.5
+
+            last_seen_diff = frame_idx - self.player_last_frame[tracker_id]
+            step_dist = 0.0
+            speed_kmh = 0.0
+
+            if len(self.player_positions[tracker_id]) > 0 and last_seen_diff <= 10:
                 prev_pos = self.player_positions[tracker_id][-1]
                 if is_world:
-                    step_dist = self.distance_calc.between(prev_pos, world_pos)
+                    raw_step_dist = self.distance_calc.between(prev_pos, world_pos)
                 else:
                     # In pixel space, assume 0.03 meters per pixel (approximate scale)
                     pixel_dist = np.linalg.norm(np.array(world_pos) - np.array(prev_pos))
-                    step_dist = float(pixel_dist * 0.03)
-                
-                # Check for tracking jumps/re-identification leaps
-                # Maximum physical running speed of a human is ~40 km/h = 11.11 m/s.
-                # Maximum step distance in 1 frame is: 11.11 * dt
-                max_step = 11.11 * self.dt
-                # Add tolerance for coordinate noise/jitter
-                max_step_with_tolerance = max_step * 1.5
-                
-                if step_dist < max_step_with_tolerance:
+                    raw_step_dist = float(pixel_dist * 0.03)
+
+                # Check physical validity of step (reject tracking jumps/ID-swaps)
+                if raw_step_dist < max_step_with_tolerance:
+                    # Temporal filtering (EMA coordinate smoothing)
+                    beta = 0.20
+                    smoothed_x = beta * world_pos[0] + (1.0 - beta) * prev_pos[0]
+                    smoothed_y = beta * world_pos[1] + (1.0 - beta) * prev_pos[1]
+                    world_pos = (smoothed_x, smoothed_y)
+
+                    # Recalculate step distance with smoothed coordinate
+                    if is_world:
+                        step_dist = self.distance_calc.between(prev_pos, world_pos)
+                    else:
+                        pixel_dist = np.linalg.norm(np.array(world_pos) - np.array(prev_pos))
+                        step_dist = float(pixel_dist * 0.03)
+
                     # Filter out micro-movements/jitter when players are stationary
                     if step_dist < 0.015:
                         step_dist = 0.0
-                    
+
                     self.player_distances[tracker_id] += step_dist
-                    
+
                     # Calculate speed
                     speed_ms = step_dist / self.dt
-                    speed_kmh = min(speed_ms * 3.6, 40.0) # Cap at realistic maximum human speed (40 km/h)
+                    speed_kmh = min(speed_ms * 3.6, 40.0)
                     self.player_speeds_history[tracker_id].append(speed_kmh)
+
+                    # Record position & update seen frame
+                    self.player_positions[tracker_id].append(world_pos)
+                    self.player_last_frame[tracker_id] = frame_idx
                 else:
-                    # Ignore anomalous tracking jump/ID-swap steps
-                    pass
-            
-            # Record current position
-            self.player_positions[tracker_id].append(world_pos)
+                    # Ignore anomalous step, keep previous position & do not update player_last_frame
+                    if self.debug:
+                        print(f"[MatchAnalytics Debug] Frame {frame_idx} | Player ID {tracker_id} | Jump rejected (dist {raw_step_dist:.2f} m > max {max_step_with_tolerance:.2f} m)")
+                    step_dist = 0.0
+                    speed_kmh = self.player_current_speeds.get(tracker_id, 0.0)
+            else:
+                # Reset or first frame of track segment: no jump checks, start fresh
+                self.player_positions[tracker_id].append(world_pos)
+                self.player_last_frame[tracker_id] = frame_idx
+                self.player_speeds_history[tracker_id].append(0.0)
+                step_dist = 0.0
+                speed_kmh = 0.0
 
             # Compute smoothed speed
             speeds = self.player_speeds_history[tracker_id]
@@ -139,6 +154,16 @@ class MatchAnalytics:
                 self.player_current_speeds[tracker_id] = float(np.mean(speeds))
             else:
                 self.player_current_speeds[tracker_id] = 0.0
+
+            if self.debug:
+                print(
+                    f"[MatchAnalytics Debug] Frame {frame_idx} | "
+                    f"Player ID: {tracker_id} | "
+                    f"Img Pos: ({img_pos[0]:.1f}, {img_pos[1]:.1f}) | "
+                    f"World Pos: ({world_pos[0]:.1f}, {world_pos[1]:.1f}) | "
+                    f"Step: {step_dist:.3f} m | "
+                    f"Speed: {self.player_current_speeds[tracker_id]:.2f} km/h"
+                )
 
         # 2. Update ball possession
         possession_event = None

@@ -30,6 +30,7 @@ def run_pipeline(
     ball_id: int = 0,
     nms_threshold: float = 0.5,
     progress_callback = None,
+    debug: bool = False,
 ) -> None:
     """
     Executes the complete integrated football analytics pipeline on a video.
@@ -62,7 +63,7 @@ def run_pipeline(
                 api_key=roboflow_api_key,
                 model_id="football-field-detection-f07vi/14"
             )
-            camera_estimator = CameraEstimator(detector=detector, pitch=pitch)
+            camera_estimator = CameraEstimator(detector=detector, pitch=pitch, debug=debug)
             print("Camera estimator successfully initialized.")
         except Exception as e:
             print(f"Warning: Could not initialize camera estimator ({e}).")
@@ -80,7 +81,7 @@ def run_pipeline(
 
     # Initialize team assigner, analytics, and visualizer
     team_assigner = TeamAssigner()
-    analytics = MatchAnalytics(fps=video_info.fps, possession_threshold_meters=2.0)
+    analytics = MatchAnalytics(fps=video_info.fps, possession_threshold_meters=2.0, debug=debug)
     visualizer = MatchVisualizer()
 
     print(f"Processing video: {source_video}...")
@@ -297,6 +298,11 @@ if __name__ == "__main__":
         default=0.5,
         help="Non-max suppression threshold (default: 0.5).",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable optional debug diagnostics for tracking, homography stability, and player telemetry.",
+    )
 
     args = parser.parse_args()
 
@@ -313,4 +319,5 @@ if __name__ == "__main__":
         lost_track_buf=args.lost_track_buf,
         ball_id=args.ball_id,
         nms_threshold=args.nms_threshold,
+        debug=args.debug,
     )

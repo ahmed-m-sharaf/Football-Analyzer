@@ -1,5 +1,7 @@
 import argparse
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import torch
 import numpy as np
 import supervision as sv
@@ -9,9 +11,9 @@ from ultralytics import YOLO
 from src.field.pitch_config import PitchConfiguration
 from src.field.pitch_detector import RoboflowPitchDetector
 from src.field.camera_estimator import CameraEstimator
-from src.team_assigner.team_assigner import TeamAssigner
+from src.detection.team_assigner import TeamAssigner
 from src.analytics.match_analytics import MatchAnalytics
-from src.visualization.match_visualizer import MatchVisualizer
+from src.utils.match_visualizer import MatchVisualizer
 
 
 def run_pipeline(
@@ -149,9 +151,24 @@ def run_pipeline(
 
             # Assign team ID to players and goalkeepers
             player_teams = {}
+            # 1. Assign standard players
             for p in frame_players:
-                if p["class_id"] in [1, 2]:  # Goalkeeper or standard player
-                    team_id = team_assigner.get_player_team(frame, p["bbox"], p["tracker_id"])
+                if p["class_id"] == 2:
+                    team_id = team_assigner.get_player_team(frame, p["bbox"], p["tracker_id"], class_id=2)
+                    p["team_id"] = team_id
+                    player_teams[p["tracker_id"]] = team_id
+
+            # 2. Assign goalkeepers
+            for p in frame_players:
+                if p["class_id"] == 1:
+                    team_id = team_assigner.get_player_team(
+                        frame,
+                        p["bbox"],
+                        p["tracker_id"],
+                        class_id=1,
+                        player_teams=player_teams,
+                        frame_players=frame_players,
+                    )
                     p["team_id"] = team_id
                     player_teams[p["tracker_id"]] = team_id
 
@@ -190,6 +207,7 @@ def run_pipeline(
             annotated = visualizer.draw_possession_hud(
                 annotated,
                 possession_percentages=metrics["possession_percentages"],
+                team_colors_kmeans=team_assigner.team_colors,
             )
 
             sink.write_frame(annotated)

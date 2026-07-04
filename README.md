@@ -38,6 +38,39 @@ graph TD
 
 ---
 
+## 📸 Sample Visualizations & Pipeline Output
+
+Here is a visual sample of the telemetry and tactical tracking pipeline output:
+
+![Pipeline Flow & Sample Output](data/images/processed_flow.png)
+
+---
+
+## 🎥 Video Processing Flow
+
+The step-by-step lifecycle of processing a video in the system:
+
+```mermaid
+graph TD
+    A[User uploads video via web UI] --> B[App saves video to data/videos/input]
+    B --> C[App displays raw video in the browser]
+    C --> D{Check: Already Processed?}
+    D -- Yes --> E[Instantly load cached H.264 video]
+    D -- No --> F[User clicks 'Process Video']
+    F --> G[Run YOLO & homography calibration]
+    G --> H[Convert temp video to HTML5 H.264 format]
+    H --> I[Save result to data/videos/output]
+    I --> E
+```
+
+1. **Upload & Storage**: The user uploads their match video through the Streamlit interface. The file is saved directly into `data/videos/input/` with its original name.
+2. **Caching Verification**: The system checks if a file with the same name exists in `data/videos/output/`. If it exists, the pipeline is skipped, loading the output instantly.
+3. **Execution & Telemetry**: If not cached, clicking "Process Video" runs the YOLO model frame-by-frame. Players are tracked, speed and distance are measured via real-world coordinate mapping, and possession is annotated.
+4. **H.264 Conversion**: The raw OpenCV video output is converted to H.264 using `imageio-ffmpeg` to ensure it is playable directly inside standard web browsers.
+5. **Interactive Playback & Download**: The processed video is displayed in a responsive side-by-side view with a download button.
+
+---
+
 ## 📁 Project Structure
 
 ```

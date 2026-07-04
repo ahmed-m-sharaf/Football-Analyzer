@@ -109,16 +109,25 @@ class MatchAnalytics:
                     step_dist = float(pixel_dist * 0.03)
                 
                 # Check for tracking jumps/re-identification leaps
-                if step_dist < self.max_valid_step:
+                # Maximum physical running speed of a human is ~40 km/h = 11.11 m/s.
+                # Maximum step distance in 1 frame is: 11.11 * dt
+                max_step = 11.11 * self.dt
+                # Add tolerance for coordinate noise/jitter
+                max_step_with_tolerance = max_step * 1.5
+                
+                if step_dist < max_step_with_tolerance:
+                    # Filter out micro-movements/jitter when players are stationary
+                    if step_dist < 0.015:
+                        step_dist = 0.0
+                    
                     self.player_distances[tracker_id] += step_dist
                     
-                    # Calculate instantaneous speed (meters per second)
+                    # Calculate speed
                     speed_ms = step_dist / self.dt
-                    # Convert to km/h
-                    speed_kmh = speed_ms * 3.6
+                    speed_kmh = min(speed_ms * 3.6, 40.0) # Cap at realistic maximum human speed (40 km/h)
                     self.player_speeds_history[tracker_id].append(speed_kmh)
                 else:
-                    # Ignore anomalous step in total distance
+                    # Ignore anomalous tracking jump/ID-swap steps
                     pass
             
             # Record current position

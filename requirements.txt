@@ -1,6 +1,6 @@
 supervision
 inference
-sports
+git+https://github.com/roboflow/sports.git
 ultralytics
 roboflow
 python-dotenv

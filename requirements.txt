@@ -3,3 +3,9 @@ inference
 sports
 ultralytics
 roboflow
+python-dotenv
+imageio-ffmpeg
+streamlit
+numpy
+opencv-python
+torch

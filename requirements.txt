@@ -9,3 +9,4 @@ streamlit
 numpy
 opencv-python
 torch
+gdown

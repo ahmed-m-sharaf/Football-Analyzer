@@ -123,6 +123,12 @@ execution_device = st.sidebar.selectbox(
     index=0,
 )
 
+debug_mode = st.sidebar.checkbox(
+    "Enable Pipeline Debug Mode",
+    value=False,
+    help="Enable optional debug diagnostics for camera homography estimation, reprojection errors, and player tracking speeds in console output."
+)
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("📐 Field Calibration")
 roboflow_api_key = st.sidebar.text_input(
@@ -225,6 +231,7 @@ with col2:
                     device=device_opt,
                     roboflow_key=roboflow_api_key if roboflow_api_key else None,
                     progress_callback=streamlit_progress_callback,
+                    debug=debug_mode,
                 )
 
                 status_text.text("Converting video to web-playable H.264 format...")

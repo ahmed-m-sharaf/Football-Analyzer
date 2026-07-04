@@ -9,15 +9,15 @@ class DistanceCalculator:
 
     Notes
     -----
-    World coordinates are expected to be in millimeters.
+    World coordinates are expected to be in standard pitch coordinate units.
     Returned distances are in meters.
     """
 
     def __init__(
         self,
-        millimeters_per_meter: float = 1000.0,
+        units_per_meter: float = 1000.0,
     ) -> None:
-        self._scale = millimeters_per_meter
+        self._scale = units_per_meter
 
     def between(
         self,

@@ -1,10 +1,10 @@
-# 🏟️ AI Football Match Analyzer
+# AI Football Match Analyzer
 
 An advanced, modular, AI-powered sports analytics platform. This system utilizes a custom YOLO object detection model, Roboflow pitch keypoint calibration, homography perspective projection, and object tracking to extract high-fidelity spatial telemetry from raw broadcast football footage.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 - **Multi-Object Detection & Tracking**: Tracks players, referees, and the match ball dynamically across frames using YOLO and ByteTrack.
 - **Goalkeeper Team Assignment**: Intelligently clusters outfield players using K-Means color clustering and assigns goalkeepers to the correct team based on average spatial proximity.
 - **Camera Calibration & Homography**: Estimates camera movement and maps image coordinates to a 2D football pitch view, enabling speed and distance estimation in meters.
@@ -13,7 +13,7 @@ An advanced, modular, AI-powered sports analytics platform. This system utilizes
 
 ---
 
-## 🏗️ System Design & Architecture
+## System Design & Architecture
 
 ```mermaid
 graph TD
@@ -38,7 +38,7 @@ graph TD
 
 ---
 
-## 📸 Sample Visualizations & Pipeline Output
+## Sample Visualizations & Pipeline Output
 
 Here is a visual sample of the telemetry and tactical tracking pipeline output:
 
@@ -46,7 +46,7 @@ Here is a visual sample of the telemetry and tactical tracking pipeline output:
 
 ---
 
-## 🎥 Video Processing Flow
+## Video Processing Flow
 
 The step-by-step lifecycle of processing a video in the system:
 
@@ -71,7 +71,7 @@ graph TD
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Football-Analyzer/
@@ -109,7 +109,7 @@ Football-Analyzer/
 
 ---
 
-## 🚀 How to Run the App & Use It
+## How to Run the App & Use It
 
 ### 1. Setup Environment
 Ensure you are using the correct Python environment:
@@ -147,14 +147,14 @@ streamlit run app.py
 
 ---
 
-## 🧩 Standalone Module Usage
+## Standalone Module Usage
 
 You can import and execute individual components of the system in your custom scripts.
 
 ### 1. Run Pipeline via CLI
 You can execute the entire pipeline from your terminal by running `src/main.py`:
 ```bash
-python src/main.py \
+python -m src.main \
   --model_path data/models/best.pt \
   --source_video data/videos/input/match.mp4 \
   --target_video data/videos/output/processed_match.mp4 \
@@ -179,7 +179,7 @@ visualizer = MatchVisualizer()
 
 ---
 
-## 👥 Project Team
+## Project Team
 
 | Name | GitHub |
 |------|--------|

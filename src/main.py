@@ -235,13 +235,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--source",
         type=str,
-        default="data/videos/input/08fd33_0.mp4",
+        default="data/videos/input/match.mp4",
         help="Path to input video file.",
     )
     parser.add_argument(
         "--target",
         type=str,
-        default="data/videos/output/annotated_08fd33_0.mp4",
+        default="data/videos/output/annotated_match.mp4",
         help="Path to save processed output video file.",
     )
     parser.add_argument(
